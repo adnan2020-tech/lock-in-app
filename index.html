@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>LOCK-IN — Discipline Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, orderBy, limit, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  // ── PASTE YOUR FIREBASE CONFIG HERE ──
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  window.__FIREBASE__ = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, doc, getDoc, setDoc, collection, addDoc, query, where, getDocs, orderBy, limit, updateDoc };
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080808;
+  --bg2:#0f0f0f;
+  --bg3:#141414;
+  --border:rgba(255,255,255,0.07);
+  --border2:rgba(255,255,255,0.04);
+  --text:#f0f0f0;
+  --text2:#888;
+  --text3:#555;
+  --green:#00ff87;
+  --green2:rgba(0,255,135,0.12);
+  --green3:rgba(0,255,135,0.06);
+  --red:#ff3b3b;
+  --red2:rgba(255,59,59,0.12);
+  --yellow:#ffd60a;
+  --yellow2:rgba(255,214,10,0.12);
+  --blue:#4488ff;
+  --r:16px;
+  --r2:12px;
+}
+html,body,#root{height:100%;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;-webkit-font-smoothing:antialiased;}
+body{overflow-x:hidden;}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ── LAYOUT ── */
+.app{max-width:420px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative;padding-bottom:80px;}
+.screen{flex:1;padding:0 16px;animation:fadeUp .3s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── GLASS CARD ── */
+.card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+}
+.card-sm{border-radius:var(--r2);}
+
+/* ── TYPOGRAPHY ── */
+.brand{font-family:'Bebas Neue',cursive;letter-spacing:.08em;}
+h1.brand{font-size:3.2rem;}
+.num{font-family:'Bebas Neue',cursive;line-height:1;}
+
+/* ── BUTTONS ── */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px 20px;border-radius:var(--r2);border:none;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;font-size:.9rem;font-weight:600;
+  transition:all .18s ease;letter-spacing:.02em;width:100%;
+}
+.btn-green{background:var(--green);color:#000;}
+.btn-green:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.btn-ghost{background:rgba(255,255,255,0.05);color:var(--text);border:1px solid var(--border);}
+.btn-ghost:hover{background:rgba(255,255,255,0.08);}
+.btn-red{background:var(--red);color:#fff;}
+.btn-sm{padding:9px 16px;font-size:.82rem;border-radius:10px;}
+
+/* ── INPUT ── */
+.input{
+  width:100%;padding:13px 16px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border);border-radius:var(--r2);
+  color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:.95rem;
+  outline:none;transition:border-color .2s;
+}
+.input:focus{border-color:rgba(255,255,255,0.2);}
+.input::placeholder{color:var(--text3);}
+select.input option{background:#1a1a1a;}
+label{font-size:.78rem;font-weight:600;color:var(--text2);letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:6px;}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:420px;
+  background:rgba(8,8,8,0.95);
+  border-top:1px solid var(--border);
+  display:flex;z-index:100;
+  backdrop-filter:blur(20px);
+  padding:8px 0 max(8px, env(safe-area-inset-bottom));
+}
+.nav-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 4px;cursor:pointer;transition:all .15s ease;border:none;background:none;
+  color:var(--text3);font-family:'Space Grotesk',sans-serif;font-size:.65rem;font-weight:600;
+  letter-spacing:.05em;text-transform:uppercase;
+}
+.nav-item.active{color:var(--green);}
+.nav-item svg{width:20px;height:20px;transition:transform .2s;}
+.nav-item.active svg{transform:scale(1.1);}
+.nav-dot{width:4px;height:4px;border-radius:50%;background:var(--green);opacity:0;transition:.2s;}
+.nav-item.active .nav-dot{opacity:1;}
+
+/* ── STATUS BADGE ── */
+.status-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 18px;border-radius:40px;font-weight:700;font-size:.85rem;letter-spacing:.04em;
+}
+.status-locked{background:var(--green2);color:var(--green);border:1px solid rgba(0,255,135,0.2);}
+.status-average{background:var(--yellow2);color:var(--yellow);border:1px solid rgba(255,214,10,0.2);}
+.status-slipping{background:var(--red2);color:var(--red);border:1px solid rgba(255,59,59,0.2);}
+.status-failed{background:rgba(255,0,0,0.08);color:#ff0000;border:1px solid rgba(255,0,0,0.15);}
+
+/* ── TASK CARD ── */
+.task-card{
+  padding:20px;display:flex;align-items:center;justify-content:space-between;
+  transition:all .22s ease;cursor:pointer;position:relative;overflow:hidden;
+}
+.task-card::before{
+  content:'';position:absolute;inset:0;opacity:0;transition:opacity .22s;
+  border-radius:inherit;
+}
+.task-card.done::before{background:var(--green3);}
+.task-card.done{border-color:rgba(0,255,135,0.18);}
+.task-icon{font-size:1.8rem;width:50px;height:50px;display:flex;align-items:center;justify-content:center;border-radius:14px;background:rgba(255,255,255,0.04);flex-shrink:0;}
+.task-info{flex:1;padding:0 16px;}
+.task-title{font-weight:700;font-size:1rem;margin-bottom:3px;}
+.task-sub{font-size:.78rem;color:var(--text2);}
+.task-toggle{
+  width:52px;height:30px;border-radius:15px;position:relative;
+  border:none;cursor:pointer;transition:all .22s ease;flex-shrink:0;
+  background:rgba(255,255,255,0.06);border:1px solid var(--border);
+}
+.task-toggle.on{background:var(--green);border-color:var(--green);box-shadow:0 0 16px rgba(0,255,135,0.3);}
+.task-toggle::after{
+  content:'';position:absolute;width:22px;height:22px;border-radius:50%;
+  top:3px;left:3px;background:#fff;transition:transform .22s ease;
+}
+.task-toggle.on::after{transform:translateX(22px);background:#000;}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,255,135,0.4)}50%{box-shadow:0 0 0 8px rgba(0,255,135,0)}}
+.task-card.just-done .task-toggle{animation:pulse .5s ease;}
+
+/* ── STREAK ── */
+.streak-bar{display:flex;gap:6px;padding:16px;}
+.streak-day{flex:1;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;letter-spacing:.04em;flex-direction:column;gap:2px;}
+.streak-day.full{background:var(--green2);color:var(--green);border:1px solid rgba(0,255,135,0.15);}
+.streak-day.partial{background:var(--yellow2);color:var(--yellow);border:1px solid rgba(255,214,10,0.15);}
+.streak-day.empty{background:var(--red2);color:var(--red);border:1px solid rgba(255,59,59,0.1);}
+.streak-day.future{background:rgba(255,255,255,0.03);color:var(--text3);border:1px solid var(--border2);}
+
+/* ── STAT BOX ── */
+.stat-box{padding:20px;text-align:center;}
+.stat-num-lg{font-size:3rem;color:var(--green);}
+.stat-label{font-size:.72rem;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-top:4px;}
+
+/* ── MONEY ── */
+.balance-display{padding:28px 20px;text-align:center;}
+.balance-amount{font-size:3.5rem;font-weight:700;}
+.tx-item{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border2);}
+.tx-item:last-child{border-bottom:none;}
+.tx-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-right:12px;}
+
+/* ── STRICT MODE WARNING ── */
+.strict-warning{
+  position:fixed;inset:0;z-index:999;
+  background:rgba(255,0,0,0.06);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.strict-card{background:#0d0000;border:1px solid rgba(255,0,0,0.25);border-radius:20px;padding:32px 24px;text-align:center;max-width:340px;width:100%;}
+
+/* ── AUTH ── */
+.auth-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:var(--bg);}
+.auth-card{width:100%;max-width:360px;padding:32px 24px;}
+
+/* ── TOGGLE SWITCH ── */
+.toggle-wrap{display:flex;align-items:center;justify-content:space-between;}
+.toggle{width:44px;height:24px;border-radius:12px;border:none;cursor:pointer;position:relative;transition:.22s;background:rgba(255,255,255,0.08);border:1px solid var(--border);}
+.toggle.on{background:var(--green);border-color:var(--green);}
+.toggle::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;top:2px;left:2px;background:#fff;transition:.22s;}
+.toggle.on::after{transform:translateX(20px);background:#000;}
+
+/* ── MISC ── */
+.divider{height:1px;background:var(--border);margin:20px 0;}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.72rem;font-weight:600;}
+.pill-green{background:var(--green2);color:var(--green);}
+.pill-red{background:var(--red2);color:var(--red);}
+.section-title{font-size:.72rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:20px 0 10px;}
+.glow-text{text-shadow:0 0 30px rgba(0,255,135,0.5);}
+.bar-chart{display:flex;gap:6px;align-items:flex-end;height:80px;}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.bar{width:100%;border-radius:4px 4px 0 0;transition:height .5s ease;min-height:4px;}
+.bar-label{font-size:.6rem;color:var(--text3);font-weight:600;}
+.error-msg{color:var(--red);font-size:.8rem;text-align:center;padding:8px;}
+.success-msg{color:var(--green);font-size:.8rem;text-align:center;padding:8px;}
+.loading{display:flex;align-items:center;justify-content:center;height:100vh;font-size:1.2rem;color:var(--text2);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+// ── HELPERS ──────────────────────────────────────
+const today = () => new Date().toISOString().split('T')[0];
+const dayName = (dateStr) => {
+  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  return days[new Date(dateStr + 'T12:00:00').getDay()];
+};
+const last7Days = () => {
+  return Array.from({length:7},(_,i)=>{
+    const d = new Date(); d.setDate(d.getDate()-6+i);
+    return d.toISOString().split('T')[0];
+  });
+};
+const formatCurrency = (n) => '৳' + Math.abs(n).toLocaleString('en-BD', {minimumFractionDigits:0});
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+// ── FIREBASE WRAPPER ─────────────────────────────
+const fb = () => window.__FIREBASE__;
+
+// ── AUTH CONTEXT ─────────────────────────────────
+const AuthScreen = ({ onAuth }) => {
+  const [mode, setMode] = useState('login');
+  const [email, setEmail] = useState('');
+  const [pass, setPass] = useState('');
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handle = async () => {
+    setErr(''); setLoading(true);
+    const { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, db, doc, setDoc } = fb();
+    try {
+      if (mode === 'signup') {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        await setDoc(doc(db,'users',cred.user.uid), {
+          uid: cred.user.uid, email, createdAt: new Date().toISOString(),
+          streak: 0, bestStreak: 0, strictMode: false
+        });
+      } else {
+        await signInWithEmailAndPassword(auth, email, pass);
+      }
+    } catch(e) {
+      const msgs = {
+        'auth/invalid-email':'Invalid email.',
+        'auth/wrong-password':'Wrong password.',
+        'auth/user-not-found':'No account found.',
+        'auth/email-already-in-use':'Email already used.',
+        'auth/weak-password':'Password must be 6+ chars.',
+      };
+      setErr(msgs[e.code] || e.message);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="auth-wrap">
+      <div style={{textAlign:'center',marginBottom:40}}>
+        <div className="brand" style={{fontSize:'4rem',color:'var(--green)',letterSpacing:'.1em'}}>LOCK-IN</div>
+        <div style={{color:'var(--text2)',fontSize:'.85rem',marginTop:4}}>No excuses. Just results.</div>
+      </div>
+      <div className="card auth-card">
+        <div style={{display:'flex',gap:8,marginBottom:24}}>
+          {['login','signup'].map(m=>(
+            <button key={m} onClick={()=>setMode(m)}
+              className="btn btn-sm"
+              style={{flex:1,background:mode===m?'rgba(255,255,255,0.08)':'transparent',
+                border:mode===m?'1px solid var(--border)':'1px solid transparent',
+                color:mode===m?'var(--text)':'var(--text3)'}}>
+              {m==='login'?'Sign In':'Sign Up'}
+            </button>
+          ))}
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <div>
+            <label>Email</label>
+            <input className="input" type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handle()}/>
+          </div>
+          <div>
+            <label>Password</label>
+            <input className="input" type="password" placeholder="••••••••" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handle()}/>
+          </div>
+          {err && <div className="error-msg">{err}</div>}
+          <button className="btn btn-green" onClick={handle} disabled={loading} style={{marginTop:4}}>
+            {loading ? '...' : mode==='login'?'SIGN IN':'CREATE ACCOUNT'}
+          </button>
+        </div>
+      </div>
+      <div style={{marginTop:20,color:'var(--text3)',fontSize:'.75rem',textAlign:'center'}}>
+        Dark. Minimal. Built for the serious.
+      </div>
+    </div>
+  );
+};
+
+// ── ICONS ─────────────────────────────────────────
+const Icon = ({ name, size=22 }) => {
+  const icons = {
+    home: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>,
+    stats: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+    money: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
+    settings: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
+    plus: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+    logout: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  };
+  return icons[name] || null;
+};
+
+// ── HOME SCREEN ───────────────────────────────────
+const HomeScreen = ({ user, userData, log, onToggle, onRefresh }) => {
+  const [justDone, setJustDone] = useState(null);
+
+  const tasks = [
+    { key:'gym', label:'Gym', icon:'🏋️', sub:'Train your body' },
+    { key:'business', label:'Business', icon:'💻', sub:'Build your empire' },
+    { key:'money', label:'Money', icon:'💰', sub:'Grow your wealth' },
+  ];
+
+  const score = (log.gym?1:0)+(log.business?1:0)+(log.money?1:0);
+
+  const statusMap = {
+    3: { label:'🔥 LOCKED IN', cls:'status-locked' },
+    2: { label:'⚠️ AVERAGE', cls:'status-average' },
+    1: { label:'❌ SLIPPING', cls:'status-slipping' },
+    0: { label:'🚨 FAILED', cls:'status-failed' },
+  };
+
+  const handleToggle = async (key) => {
+    setJustDone(key);
+    await onToggle(key, !log[key]);
+    setTimeout(()=>setJustDone(null), 600);
+  };
+
+  const dateStr = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  return (
+    <div className="screen">
+      {/* Header */}
+      <div style={{paddingTop:24,paddingBottom:8}}>
+        <div style={{fontSize:'.75rem',color:'var(--text2)',fontWeight:600,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>{dateStr}</div>
+        <div className="brand glow-text" style={{fontSize:'3rem',lineHeight:1,color:'var(--green)'}}>LOCK-IN</div>
+      </div>
+
+      {/* Score + Status */}
+      <div className="card" style={{padding:'20px',marginBottom:16,marginTop:12}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+          <div>
+            <div style={{fontSize:'.72rem',color:'var(--text2)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:4}}>Today's Score</div>
+            <div style={{display:'flex',alignItems:'baseline',gap:4}}>
+              <span className="num" style={{fontSize:'4rem',color:score===3?'var(--green)':score===2?'var(--yellow)':score===1?'var(--red)':'#ff0000'}}>{score}</span>
+              <span style={{color:'var(--text3)',fontSize:'1.5rem',fontWeight:300}}>/3</span>
+            </div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div className={`status-badge ${statusMap[score].cls}`}>{statusMap[score].label}</div>
+            <div style={{marginTop:10,display:'flex',gap:12,justifyContent:'flex-end'}}>
+              <div style={{textAlign:'center'}}>
+                <div className="num" style={{fontSize:'1.6rem',color:'var(--green)'}}>{userData?.streak||0}</div>
+                <div style={{fontSize:'.62rem',color:'var(--text3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em'}}>Streak</div>
+              </div>
+              <div style={{textAlign:'center'}}>
+                <div className="num" style={{fontSize:'1.6rem',color:'var(--text2)'}}>{userData?.bestStreak||0}</div>
+                <div style={{fontSize:'.62rem',color:'var(--text3)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em'}}>Best</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div style={{height:4,background:'rgba(255,255,255,0.05)',borderRadius:2,overflow:'hidden'}}>
+          <div style={{height:'100%',borderRadius:2,width:`${(score/3)*100}%`,
+            background:score===3?'var(--green)':score===2?'var(--yellow)':'var(--red)',
+            transition:'width .4s ease',boxShadow:score===3?'0 0 8px rgba(0,255,135,0.6)':'none'}}/>
+        </div>
+      </div>
+
+      {/* Task Cards */}
+      <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:16}}>
+        {tasks.map(t=>(
+          <div key={t.key}
+            className={`card task-card ${log[t.key]?'done':''} ${justDone===t.key?'just-done':''}`}
+            onClick={()=>handleToggle(t.key)}>
+            <div className="task-icon">{t.icon}</div>
+            <div className="task-info">
+              <div className="task-title" style={{color:log[t.key]?'var(--green)':'var(--text)'}}>{t.label}</div>
+              <div className="task-sub">{log[t.key]?'Completed ✓':t.sub}</div>
+            </div>
+            <div className={`task-toggle ${log[t.key]?'on':''}`}/>
+          </div>
+        ))}
+      </div>
+
+      {/* Motivational line */}
+      <div style={{textAlign:'center',padding:'12px 0 8px',color:'var(--text3)',fontSize:'.78rem',fontStyle:'italic'}}>
+        {score===3?"You're locked in. Keep the chain alive." :
+         score===2?"Two done. Finish what you started." :
+         score===1?"One is not enough. You know that." :
+         "Every second counts. Start now."}
+      </div>
+    </div>
+  );
+};
+
+// ── STATS SCREEN ──────────────────────────────────
+const StatsScreen = ({ uid }) => {
+  const [logs, setLogs] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    const load = async () => {
+      const { db, collection, query, where, getDocs, orderBy } = fb();
+      const d7 = last7Days();
+      const start = d7[0];
+      const q = query(collection(db,'dailyLogs'), where('uid','==',uid), where('date','>=',start));
+      const snap = await getDocs(q);
+      const map = {};
+      snap.forEach(d=>{ map[d.data().date]=d.data(); });
+      setLogs(map); setLoading(false);
+    };
+    load();
+  },[uid]);
+
+  const days = last7Days();
+  const totalScore = days.reduce((s,d)=>(logs[d]?.score||0)+s,0);
+  const maxScore = 21;
+  const pct = Math.round((totalScore/maxScore)*100);
+  const fullDays = days.filter(d=>logs[d]?.score===3).length;
+
+  const getDayColor = (d) => {
+    const s = logs[d]?.score;
+    if(s===3) return 'var(--green)';
+    if(s===2) return 'var(--yellow)';
+    if(s===1||s===0) return 'var(--red)';
+    const today2 = new Date().toISOString().split('T')[0];
+    return d<=today2 ? 'rgba(255,59,59,0.3)' : 'rgba(255,255,255,0.06)';
+  };
+
+  if(loading) return <div className="loading">Loading...</div>;
+
+  return (
+    <div className="screen">
+      <div style={{paddingTop:24,paddingBottom:8}}>
+        <div className="brand" style={{fontSize:'2rem',color:'var(--text)'}}>STATS</div>
+        <div style={{color:'var(--text2)',fontSize:'.8rem',marginTop:2}}>Last 7 days</div>
+      </div>
+
+      {/* Weekly score */}
+      <div className="card" style={{marginBottom:12,marginTop:12}}>
+        <div style={{display:'flex'}}>
+          <div className="stat-box" style={{flex:1,borderRight:'1px solid var(--border)'}}>
+            <div className="num stat-num-lg">{totalScore}</div>
+            <div className="stat-label">Weekly Score</div>
+            <div style={{fontSize:'.7rem',color:'var(--text3)',marginTop:2}}>out of {maxScore}</div>
+          </div>
+          <div className="stat-box" style={{flex:1,borderRight:'1px solid var(--border)'}}>
+            <div className="num stat-num-lg" style={{color:pct>=80?'var(--green)':pct>=50?'var(--yellow)':'var(--red)'}}>{pct}%</div>
+            <div className="stat-label">Completion</div>
+          </div>
+          <div className="stat-box" style={{flex:1}}>
+            <div className="num stat-num-lg" style={{color:'var(--green)'}}>{fullDays}</div>
+            <div className="stat-label">Locked Days</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bar chart */}
+      <div className="card" style={{padding:'20px',marginBottom:12}}>
+        <div style={{fontSize:'.72rem',color:'var(--text2)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:16}}>Daily Breakdown</div>
+        <div className="bar-chart">
+          {days.map(d=>{
+            const s = logs[d]?.score || 0;
+            const isFuture = d > new Date().toISOString().split('T')[0];
+            const h = isFuture ? 8 : Math.max((s/3)*100,8);
+            return (
+              <div key={d} className="bar-col">
+                <div style={{flex:1,display:'flex',alignItems:'flex-end',width:'100%'}}>
+                  <div className="bar" style={{height:`${h}%`,background:getDayColor(d),
+                    boxShadow:s===3?'0 0 8px rgba(0,255,135,0.4)':'none'}}/>
+                </div>
+                <div className="bar-label">{dayName(d)}</div>
+                <div style={{fontSize:'.62rem',color:'var(--text3)',fontWeight:700}}>{isFuture?'-':s}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Per category */}
+      <div className="card" style={{padding:'20px',marginBottom:12}}>
+        <div style={{fontSize:'.72rem',color:'var(--text2)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:16}}>Category Breakdown</div>
+        {[['gym','🏋️','Gym'],['business','💻','Business'],['money','💰','Money']].map(([key,icon,label])=>{
+          const done = days.filter(d=>logs[d]?.[key]).length;
+          const total = days.filter(d=>d<=new Date().toISOString().split('T')[0]).length;
+          const p = total ? Math.round((done/total)*100) : 0;
+          return (
+            <div key={key} style={{marginBottom:14}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:'1rem'}}>{icon}</span>
+                  <span style={{fontSize:'.88rem',fontWeight:600}}>{label}</span>
+                </div>
+                <span style={{fontSize:'.8rem',fontWeight:700,color:p>=80?'var(--green)':p>=50?'var(--yellow)':'var(--red)'}}>{done}/{total}</span>
+              </div>
+              <div style={{height:6,background:'rgba(255,255,255,0.05)',borderRadius:3,overflow:'hidden'}}>
+                <div style={{height:'100%',borderRadius:3,width:`${p}%`,
+                  background:p>=80?'var(--green)':p>=50?'var(--yellow)':'var(--red)',
+                  transition:'width .5s ease'}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ── MONEY SCREEN ──────────────────────────────────
+const MoneyScreen = ({ uid }) => {
+  const [txs, setTxs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [type, setType] = useState('income');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  const loadTxs = async () => {
+    const { db, collection, query, where, getDocs, orderBy } = fb();
+    const q = query(collection(db,'transactions'), where('uid','==',uid), orderBy('createdAt','desc'));
+    const snap = await getDocs(q);
+    setTxs(snap.docs.map(d=>({id:d.id,...d.data()})));
+    setLoading(false);
+  };
+
+  useEffect(()=>{ loadTxs(); },[uid]);
+
+  const balance = txs.reduce((s,t)=>s+(t.type==='income'?t.amount:-t.amount),0);
+
+  const weekTxs = txs.filter(t=>{
+    const d = new Date(t.createdAt); const now = new Date();
+    return (now-d)/(1000*60*60*24) <= 7;
+  });
+  const weekIncome = weekTxs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const weekExpense = weekTxs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+
+  const addTx = async () => {
+    if(!amount || isNaN(amount) || Number(amount)<=0) { setMsg('Enter a valid amount'); return; }
+    setSaving(true);
+    const { db, collection, addDoc } = fb();
+    await addDoc(collection(db,'transactions'),{
+      uid, amount:Number(amount), type, note, createdAt:new Date().toISOString()
+    });
+    setMsg(''); setAmount(''); setNote(''); setShowForm(false);
+    await loadTxs(); setSaving(false);
+  };
+
+  if(loading) return <div className="loading">Loading...</div>;
+
+  return (
+    <div className="screen">
+      <div style={{paddingTop:24,paddingBottom:8}}>
+        <div className="brand" style={{fontSize:'2rem',color:'var(--text)'}}>MONEY</div>
+        <div style={{color:'var(--text2)',fontSize:'.8rem',marginTop:2}}>Track every taka</div>
+      </div>
+
+      {/* Balance */}
+      <div className="card" style={{marginTop:12,marginBottom:12}}>
+        <div className="balance-display">
+          <div style={{fontSize:'.72rem',color:'var(--text2)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>Current Balance</div>
+          <div className="balance-amount" style={{color:balance>=0?'var(--green)':'var(--red)',fontFamily:'Bebas Neue',letterSpacing:'.02em'}}>
+            {balance>=0?'+':'-'}{formatCurrency(balance)}
+          </div>
+        </div>
+        <div style={{display:'flex',borderTop:'1px solid var(--border)'}}>
+          <div style={{flex:1,padding:'14px 16px',textAlign:'center',borderRight:'1px solid var(--border)'}}>
+            <div style={{color:'var(--green)',fontWeight:700,fontSize:'1rem'}}>+{formatCurrency(weekIncome)}</div>
+            <div style={{color:'var(--text3)',fontSize:'.65rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3}}>This Week In</div>
+          </div>
+          <div style={{flex:1,padding:'14px 16px',textAlign:'center'}}>
+            <div style={{color:'var(--red)',fontWeight:700,fontSize:'1rem'}}>-{formatCurrency(weekExpense)}</div>
+            <div style={{color:'var(--text3)',fontSize:'.65rem',fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em',marginTop:3}}>This Week Out</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add button */}
+      {!showForm ? (
+        <button className="btn btn-green" style={{marginBottom:12}} onClick={()=>setShowForm(true)}>
+          <Icon name="plus" size={16}/> Add Transaction
+        </button>
+      ) : (
+        <div className="card" style={{padding:20,marginBottom:12}}>
+          <div style={{fontWeight:700,marginBottom:16,fontSize:'.9rem'}}>New Transaction</div>
+          <div style={{display:'flex',gap:8,marginBottom:14}}>
+            {['income','expense'].map(t=>(
+              <button key={t} onClick={()=>setType(t)}
+                className="btn btn-sm"
+                style={{flex:1,background:type===t?(t==='income'?'var(--green2)':'var(--red2)'):'transparent',
+                  border:`1px solid ${type===t?(t==='income'?'rgba(0,255,135,0.3)':'rgba(255,59,59,0.3)'):'var(--border)'}`,
+                  color:type===t?(t==='income'?'var(--green)':'var(--red)'):'var(--text2)'}}>
+                {t==='income'?'+ Income':'- Expense'}
+              </button>
+            ))}
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <div>
+              <label>Amount (৳)</label>
+              <input className="input" type="number" placeholder="0" value={amount} onChange={e=>setAmount(e.target.value)}/>
+            </div>
+            <div>
+              <label>Note</label>
+              <input className="input" placeholder="What was this for?" value={note} onChange={e=>setNote(e.target.value)}/>
+            </div>
+            {msg && <div className="error-msg">{msg}</div>}
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setShowForm(false);setMsg('');}}>Cancel</button>
+              <button className={`btn ${type==='income'?'btn-green':'btn-red'}`} style={{flex:1}} onClick={addTx} disabled={saving}>
+                {saving?'...':'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transactions list */}
+      <div className="card" style={{overflow:'hidden',marginBottom:12}}>
+        <div style={{padding:'14px 16px',borderBottom:'1px solid var(--border)',fontSize:'.72rem',color:'var(--text2)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em'}}>
+          Recent Transactions
+        </div>
+        {txs.length===0 ? (
+          <div style={{padding:24,textAlign:'center',color:'var(--text3)',fontSize:'.85rem'}}>No transactions yet.</div>
+        ) : txs.slice(0,20).map(t=>(
+          <div key={t.id} className="tx-item">
+            <div style={{display:'flex',alignItems:'center',flex:1}}>
+              <div className="tx-dot" style={{background:t.type==='income'?'var(--green)':'var(--red)'}}/>
+              <div>
+                <div style={{fontSize:'.88rem',fontWeight:600}}>{t.note||t.type}</div>
+                <div style={{fontSize:'.7rem',color:'var(--text3)',marginTop:2}}>{new Date(t.createdAt).toLocaleDateString('en-BD',{month:'short',day:'numeric'})}</div>
+              </div>
+            </div>
+            <div style={{fontWeight:700,color:t.type==='income'?'var(--green)':'var(--red)',fontSize:'.95rem'}}>
+              {t.type==='income'?'+':'-'}{formatCurrency(t.amount)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ── SETTINGS SCREEN ───────────────────────────────
+const SettingsScreen = ({ user, userData, onUpdate, onLogout }) => {
+  const [strict, setStrict] = useState(userData?.strictMode||false);
+  const [saving, setSaving] = useState(false);
+
+  const toggleStrict = async () => {
+    setSaving(true);
+    const { db, doc, updateDoc } = fb();
+    const newVal = !strict;
+    await updateDoc(doc(db,'users',user.uid), { strictMode:newVal });
+    setStrict(newVal);
+    onUpdate({ ...userData, strictMode:newVal });
+    setSaving(false);
+  };
+
+  return (
+    <div className="screen">
+      <div style={{paddingTop:24,paddingBottom:8}}>
+        <div className="brand" style={{fontSize:'2rem',color:'var(--text)'}}>SETTINGS</div>
+        <div style={{color:'var(--text2)',fontSize:'.8rem',marginTop:2}}>{user.email}</div>
+      </div>
+
+      <div className="card" style={{marginTop:12,marginBottom:12}}>
+        <div style={{padding:'16px 20px',borderBottom:'1px solid var(--border)'}}>
+          <div className="toggle-wrap">
+            <div>
+              <div style={{fontWeight:700,fontSize:'.9rem',marginBottom:4}}>Strict Mode</div>
+              <div style={{color:'var(--text2)',fontSize:'.78rem'}}>Miss 2 days → streak resets instantly</div>
+            </div>
+            <button className={`toggle ${strict?'on':''}`} onClick={toggleStrict} disabled={saving}/>
+          </div>
+        </div>
+        {strict && (
+          <div style={{padding:'12px 20px',background:'var(--red2)',borderBottom:'1px solid var(--border)'}}>
+            <div style={{fontSize:'.78rem',color:'var(--red)',fontWeight:600}}>⚠️ Strict Mode Active — No mercy. Miss 2 days, start over.</div>
+          </div>
+        )}
+        <div style={{padding:'16px 20px'}}>
+          <div style={{fontSize:'.72rem',color:'var(--text2)',fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:12}}>Account</div>
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            <div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid var(--border2)'}}>
+              <span style={{fontSize:'.85rem',color:'var(--text2)'}}>Current Streak</span>
+              <span style={{fontWeight:700,color:'var(--green)'}}>{userData?.streak||0} days 🔥</span>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',padding:'10px 0'}}>
+              <span style={{fontSize:'.85rem',color:'var(--text2)'}}>Best Streak</span>
+              <span style={{fontWeight:700,color:'var(--text)'}}>{userData?.bestStreak||0} days</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button className="btn btn-ghost" onClick={onLogout} style={{borderColor:'rgba(255,59,59,0.2)',color:'var(--red)'}}>
+        <Icon name="logout" size={16}/> Sign Out
+      </button>
+
+      <div style={{textAlign:'center',padding:'24px 0',color:'var(--text3)',fontSize:'.72rem'}}>
+        LOCK-IN v1.0 · Built by Adnan Sami<br/>No excuses. Just results.
+      </div>
+    </div>
+  );
+};
+
+// ── STRICT WARNING ────────────────────────────────
+const StrictWarning = ({ onDismiss }) => (
+  <div className="strict-warning">
+    <div className="strict-card">
+      <div style={{fontSize:'3rem',marginBottom:12}}>🚨</div>
+      <div style={{fontFamily:'Bebas Neue',fontSize:'2rem',color:'var(--red)',letterSpacing:'.06em',marginBottom:12}}>WEEKLY FAIL</div>
+      <div style={{color:'var(--text2)',fontSize:'.85rem',lineHeight:1.6,marginBottom:24}}>
+        Your weekly score is below 18. You're not locked in.<br/>
+        <strong style={{color:'var(--text)'}}>Stop slipping. Fix your habits.</strong>
+      </div>
+      <button className="btn btn-red" onClick={onDismiss}>I Understand. Fix It.</button>
+    </div>
+  </div>
+);
+
+// ── MAIN APP ──────────────────────────────────────
+const App = () => {
+  const [authUser, setAuthUser] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [todayLog, setTodayLog] = useState({ gym:false, business:false, money:false });
+  const [logId, setLogId] = useState(null);
+  const [screen, setScreen] = useState('home');
+  const [loading, setLoading] = useState(true);
+  const [showStrict, setShowStrict] = useState(false);
+
+  // Auth listener
+  useEffect(()=>{
+    const unsubscribe = fb().onAuthStateChanged(fb().auth, async user=>{
+      if(user){
+        setAuthUser(user);
+        await loadUserData(user.uid);
+        await loadTodayLog(user.uid);
+      } else {
+        setAuthUser(null); setUserData(null);
+      }
+      setLoading(false);
+    });
+    return unsubscribe;
+  },[]);
+
+  const loadUserData = async (uid) => {
+    const { db, doc, getDoc } = fb();
+    const snap = await getDoc(doc(db,'users',uid));
+    if(snap.exists()) setUserData(snap.data());
+  };
+
+  const loadTodayLog = async (uid) => {
+    const { db, collection, query, where, getDocs } = fb();
+    const d = today();
+    const q = query(collection(db,'dailyLogs'), where('uid','==',uid), where('date','==',d));
+    const snap = await getDocs(q);
+    if(!snap.empty){
+      const data = snap.docs[0].data();
+      setTodayLog({ gym:data.gym, business:data.business, money:data.money });
+      setLogId(snap.docs[0].id);
+    }
+  };
+
+  const handleToggle = async (key, val) => {
+    const { db, doc, setDoc, updateDoc, collection, addDoc, getDoc, query, where, getDocs } = fb();
+    const newLog = { ...todayLog, [key]:val };
+    const score = (newLog.gym?1:0)+(newLog.business?1:0)+(newLog.money?1:0);
+    setTodayLog(newLog);
+
+    const d = today();
+    const uid = authUser.uid;
+
+    if(logId) {
+      await updateDoc(doc(db,'dailyLogs',logId),{ ...newLog, score });
+    } else {
+      const ref = await addDoc(collection(db,'dailyLogs'),{ uid, date:d, ...newLog, score });
+      setLogId(ref.id);
+    }
+
+    // Update streak if score === 3
+    const uSnap = await getDoc(doc(db,'users',uid));
+    const uData = uSnap.data();
+    let { streak=0, bestStreak=0, strictMode=false } = uData;
+
+    if(score===3){
+      streak = streak + 1;
+      if(streak > bestStreak) bestStreak = streak;
+    } else if(score < 3 && logId) {
+      // Only reduce if day was previously complete
+    }
+
+    await updateDoc(doc(db,'users',uid),{ streak, bestStreak });
+    setUserData(prev=>({...prev, streak, bestStreak}));
+
+    // Strict mode weekly check
+    if(strictMode && score===3){
+      const q = query(collection(db,'dailyLogs'), where('uid','==',uid));
+      const snap = await getDocs(q);
+      const days = last7Days();
+      const weekScore = days.reduce((s,day)=>{
+        const found = snap.docs.find(d=>d.data().date===day);
+        return s + (found?.data()?.score||0);
+      },0);
+      if(weekScore < 18) setShowStrict(true);
+    }
+  };
+
+  const handleLogout = async () => {
+    await fb().signOut(fb().auth);
+    setAuthUser(null); setUserData(null);
+    setTodayLog({ gym:false, business:false, money:false });
+    setLogId(null);
+  };
+
+  if(loading) return (
+    <div className="loading" style={{flexDirection:'column',gap:12}}>
+      <div className="brand" style={{fontSize:'3rem',color:'var(--green)'}}>LOCK-IN</div>
+      <div style={{color:'var(--text3)',fontSize:'.8rem'}}>Loading...</div>
+    </div>
+  );
+
+  if(!authUser) return <AuthScreen onAuth={()=>{}} />;
+
+  const navItems = [
+    { key:'home', label:'Home', icon:'home' },
+    { key:'stats', label:'Stats', icon:'stats' },
+    { key:'money', label:'Money', icon:'money' },
+    { key:'settings', label:'Settings', icon:'settings' },
+  ];
+
+  return (
+    <div className="app">
+      {showStrict && <StrictWarning onDismiss={()=>setShowStrict(false)}/>}
+
+      {/* Screens */}
+      {screen==='home' && (
+        <HomeScreen user={authUser} userData={userData} log={todayLog}
+          onToggle={handleToggle} onRefresh={()=>loadTodayLog(authUser.uid)}/>
+      )}
+      {screen==='stats' && <StatsScreen uid={authUser.uid}/>}
+      {screen==='money' && <MoneyScreen uid={authUser.uid}/>}
+      {screen==='settings' && (
+        <SettingsScreen user={authUser} userData={userData}
+          onUpdate={setUserData} onLogout={handleLogout}/>
+      )}
+
+      {/* Bottom Nav */}
+      <div className="bottom-nav">
+        {navItems.map(n=>(
+          <button key={n.key} className={`nav-item ${screen===n.key?'active':''}`} onClick={()=>setScreen(n.key)}>
+            <Icon name={n.icon}/>
+            <div className="nav-dot"/>
+            <span>{n.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
